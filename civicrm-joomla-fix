@@ -1,0 +1,58 @@
+#! /bin/bash
+#
+# This script fixes up paths and URLs in a CiviCRM installation
+# Typically you need this when restoring a copy of an existing installation
+# The script is tuned to an installation in a docker so
+# OLD_PATH and OLD_HOST need to be defined when running this script
+#
+
+if [ "$#" -lt 2 ]; then
+    echo "$0 <old_path> <new_web_host> <new_db_host> [<database> [<db_user> [<db_password>]]]"
+    echo "  old_path     = absolute path for Joomla root on original system"
+    echo "  new_web_host = domain name of new web host"
+    echo "  new_db_host  = domain name of original db host"
+    echo "  database     = name of database, default 'joomla'"
+    echo "  db_user      = database user, default same as database"
+    echo "  db_password  = database password, default same as db_user"
+    exit
+fi
+
+OLD_PATH=$1
+NEW_WEB_HOST=$2
+NEW_DB_HOST=$3
+if [[ -n "$4" ]] ; then
+    DB_NAME="$4"
+else
+    DB_NAME="joomla"
+fi
+if [[ -n "$5" ]] ; then
+    DB_USER="$5"
+else
+    DB_USER=$DB_NAME
+fi
+if [[ -n "$6" ]] ; then
+    DB_PASSWORD="$6"
+else
+    DB_PASSWORD=$DB_USER
+fi
+echo "old_path     = $OLD_PATH"
+echo "new_web_host = $NEW_WEB_HOST"
+echo "new_db_host  = $NEW_DB_HOST"
+echo "db_name      = $DB_NAME"
+echo "db_user      = $DB_USER"
+echo "db_password  = $DB_PASSWORD"
+
+# For some reason we cannot use "--in-place" from inside the docker container...
+host_replacement="s|https://[^/]*|https://$NEW_WEB_HOST|g"
+sed "$host_replacement" components/com_civicrm/civicrm.settings.php > sed-tmp ; cp sed-tmp components/com_civicrm/civicrm.settings.php
+sed "$host_replacement" administrator/components/com_civicrm/civicrm.settings.php > sed-tmp ; cp sed-tmp administrator/components/com_civicrm/civicrm.settings.php
+
+db_replacement="s|mysql://[^:]*:[^@]*@[^/]*/[^?]*|mysql://$DB_USER:$DB_PASSWORD@$NEW_DB_HOST/$DB_NAME|"
+sed "$db_replacement" components/com_civicrm/civicrm.settings.php  > sed-tmp ; cp sed-tmp components/com_civicrm/civicrm.settings.php
+sed "$db_replacement" administrator/components/com_civicrm/civicrm.settings.php > sed-tmp ; cp sed-tmp administrator/components/com_civicrm/civicrm.settings.php
+
+# TODO We could figure out old path from any of the configuration files
+path_replacement="s|$OLD_PATH|$PWD|"
+sed "$path_replacement" components/com_civicrm/civicrm.settings.php  > sed-tmp ; cp sed-tmp components/com_civicrm/civicrm.settings.php
+sed "$path_replacement" administrator/components/com_civicrm/civicrm.settings.php > sed-tmp ; cp sed-tmp administrator/components/com_civicrm/civicrm.settings.php
+sed "$path_replacement" administrator/components/com_civicrm/civicrm/civicrm.config.php > sed-tmp ; cp sed-tmp administrator/components/com_civicrm/civicrm/civicrm.config.php
